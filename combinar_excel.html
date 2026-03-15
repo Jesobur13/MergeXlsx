@@ -1,0 +1,451 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Combinar Archivos Excel</title>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: 'Segoe UI', sans-serif;
+      background: #f0f4f8;
+      min-height: 100vh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 20px;
+    }
+    .card {
+      background: #fff;
+      border-radius: 16px;
+      box-shadow: 0 8px 30px rgba(0,0,0,0.1);
+      padding: 40px;
+      max-width: 680px;
+      width: 100%;
+    }
+    .header {
+      display: flex;
+      align-items: center;
+      gap: 14px;
+      margin-bottom: 28px;
+    }
+    .header-icon {
+      background: #1d6f42;
+      color: white;
+      border-radius: 12px;
+      width: 52px;
+      height: 52px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 26px;
+      flex-shrink: 0;
+    }
+    .header h1 { font-size: 22px; color: #1a1a2e; }
+    .header p  { font-size: 13px; color: #6b7280; margin-top: 3px; }
+
+    .dropzone {
+      border: 2px dashed #c4d4e0;
+      border-radius: 12px;
+      padding: 36px 24px;
+      text-align: center;
+      cursor: pointer;
+      transition: all 0.2s;
+      background: #f8fafc;
+      margin-bottom: 20px;
+    }
+    .dropzone:hover, .dropzone.dragover {
+      border-color: #1d6f42;
+      background: #edf7f1;
+    }
+    .dropzone .dz-icon { font-size: 42px; margin-bottom: 10px; }
+    .dropzone h3 { font-size: 15px; color: #374151; }
+    .dropzone p  { font-size: 12px; color: #9ca3af; margin-top: 5px; }
+    .dropzone input { display: none; }
+
+    .options {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 14px;
+      margin-bottom: 22px;
+    }
+    .option-group { flex: 1; min-width: 200px; }
+    .option-group label {
+      display: block;
+      font-size: 12px;
+      font-weight: 600;
+      color: #374151;
+      margin-bottom: 6px;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+    .option-group select, .option-group input[type="text"] {
+      width: 100%;
+      border: 1px solid #d1d5db;
+      border-radius: 8px;
+      padding: 9px 12px;
+      font-size: 13px;
+      color: #374151;
+      background: #f9fafb;
+      outline: none;
+      transition: border 0.2s;
+    }
+    .option-group select:focus, .option-group input:focus {
+      border-color: #1d6f42;
+    }
+
+    .toggle-row {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      margin-bottom: 20px;
+      font-size: 13px;
+      color: #374151;
+    }
+    .toggle { position: relative; width: 40px; height: 22px; }
+    .toggle input { opacity: 0; width: 0; height: 0; }
+    .slider {
+      position: absolute; cursor: pointer; top: 0; left: 0; right: 0; bottom: 0;
+      background: #cbd5e1; border-radius: 22px; transition: 0.3s;
+    }
+    .slider:before {
+      content: ""; position: absolute; height: 16px; width: 16px;
+      left: 3px; bottom: 3px; background: white;
+      border-radius: 50%; transition: 0.3s;
+    }
+    .toggle input:checked + .slider { background: #1d6f42; }
+    .toggle input:checked + .slider:before { transform: translateX(18px); }
+
+    #file-list {
+      list-style: none;
+      margin-bottom: 20px;
+      max-height: 220px;
+      overflow-y: auto;
+      display: none;
+    }
+    #file-list li {
+      display: flex;
+      align-items: center;
+      padding: 8px 12px;
+      background: #f3f4f6;
+      border-radius: 8px;
+      margin-bottom: 6px;
+      font-size: 13px;
+      color: #374151;
+      gap: 6px;
+    }
+    #file-list li .order {
+      font-size: 11px;
+      font-weight: 700;
+      color: #1d6f42;
+      background: #dcfce7;
+      border-radius: 6px;
+      padding: 2px 7px;
+      flex-shrink: 0;
+    }
+    #file-list li .name { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    #file-list li .size { font-size: 11px; color: #9ca3af; flex-shrink: 0; }
+    #file-list li button {
+      background: none; border: none; cursor: pointer;
+      color: #ef4444; font-size: 16px; margin-left: 4px; line-height: 1;
+      flex-shrink: 0;
+    }
+
+    .sort-info {
+      font-size: 12px;
+      color: #1d6f42;
+      background: #dcfce7;
+      border-radius: 8px;
+      padding: 8px 12px;
+      margin-bottom: 16px;
+      display: none;
+    }
+
+    #progress-wrap { display: none; margin-bottom: 18px; }
+    #progress-label { font-size: 12px; color: #6b7280; margin-bottom: 6px; }
+    #progress-bar-bg {
+      background: #e5e7eb; border-radius: 8px; height: 8px; overflow: hidden;
+    }
+    #progress-bar {
+      height: 100%; width: 0; background: #1d6f42;
+      border-radius: 8px; transition: width 0.3s;
+    }
+
+    .btn-row { display: flex; gap: 12px; }
+    .btn {
+      flex: 1; padding: 13px; border: none; border-radius: 10px;
+      font-size: 14px; font-weight: 600; cursor: pointer; transition: all 0.2s;
+    }
+    .btn-primary { background: #1d6f42; color: white; }
+    .btn-primary:hover { background: #165a35; transform: translateY(-1px); }
+    .btn-primary:disabled { background: #9ca3af; cursor: not-allowed; transform: none; }
+    .btn-secondary { background: #f3f4f6; color: #374151; }
+    .btn-secondary:hover { background: #e5e7eb; }
+
+    #status {
+      display: none; margin-top: 16px; padding: 12px 16px;
+      border-radius: 10px; font-size: 13px; font-weight: 500;
+    }
+    #status.success { background: #dcfce7; color: #15803d; border: 1px solid #bbf7d0; }
+    #status.error   { background: #fee2e2; color: #dc2626; border: 1px solid #fecaca; }
+
+    #file-count-badge {
+      display: inline-block; background: #1d6f42; color: white;
+      border-radius: 20px; padding: 2px 10px; font-size: 12px;
+      margin-left: 8px; vertical-align: middle;
+    }
+  </style>
+</head>
+<body>
+<div class="card">
+
+  <div class="header">
+    <div class="header-icon">📊</div>
+    <div>
+      <h1>Combinar Archivos Excel <span id="file-count-badge" style="display:none">0</span></h1>
+      <p>Une múltiples archivos .xlsx / .xls en un solo libro · orden automático</p>
+    </div>
+  </div>
+
+  <!-- Drop Zone -->
+  <div class="dropzone" id="dropzone">
+    <div class="dz-icon">📁</div>
+    <h3>Arrastra tus archivos aquí o haz clic para seleccionar</h3>
+    <p>Soporta .xlsx y .xls · Orden automático: 09d01 → 09d02 → 09d03…</p>
+    <input type="file" id="file-input" multiple accept=".xlsx,.xls" />
+  </div>
+
+  <!-- Info de orden -->
+  <div class="sort-info" id="sort-info">
+    🔢 Los archivos se ordenarán automáticamente por nombre antes de combinarse.
+  </div>
+
+  <!-- Lista de archivos -->
+  <ul id="file-list"></ul>
+
+  <!-- Opciones -->
+  <div class="options">
+    <div class="option-group">
+      <label>Modo de combinación</label>
+      <select id="mode">
+        <option value="append">Apilar filas (misma estructura)</option>
+        <option value="sheets">Una hoja por archivo</option>
+      </select>
+    </div>
+    <div class="option-group">
+      <label>Nombre del archivo final</label>
+      <input type="text" id="output-name" value="Combinado" placeholder="ej. Consolidado_2025" />
+    </div>
+  </div>
+
+  <div class="toggle-row">
+    <label class="toggle">
+      <input type="checkbox" id="include-header" checked>
+      <span class="slider"></span>
+    </label>
+    Incluir encabezados solo en la primera hoja / primera vez
+  </div>
+
+  <!-- Barra de progreso -->
+  <div id="progress-wrap">
+    <div id="progress-label">Procesando…</div>
+    <div id="progress-bar-bg"><div id="progress-bar"></div></div>
+  </div>
+
+  <!-- Botones -->
+  <div class="btn-row">
+    <button class="btn btn-secondary" id="btn-clear">🗑 Limpiar</button>
+    <button class="btn btn-primary" id="btn-combine" disabled>⬇ Combinar y Descargar</button>
+  </div>
+
+  <div id="status"></div>
+</div>
+
+<script>
+  let files = [];
+
+  const dropzone     = document.getElementById('dropzone');
+  const fileInput    = document.getElementById('file-input');
+  const fileList     = document.getElementById('file-list');
+  const badge        = document.getElementById('file-count-badge');
+  const sortInfo     = document.getElementById('sort-info');
+  const btnCombine   = document.getElementById('btn-combine');
+  const btnClear     = document.getElementById('btn-clear');
+  const statusEl     = document.getElementById('status');
+  const progressWrap = document.getElementById('progress-wrap');
+  const progressBar  = document.getElementById('progress-bar');
+  const progressLbl  = document.getElementById('progress-label');
+
+  // Orden alfanumérico natural: 09d01 < 09d02 < 09d10
+  function naturalSort(a, b) {
+    const re = /(\d+)/g;
+    const ax = a.name.split(re);
+    const bx = b.name.split(re);
+    for (let i = 0; i < Math.max(ax.length, bx.length); i++) {
+      const av = ax[i] || '';
+      const bv = bx[i] || '';
+      const an = parseInt(av, 10);
+      const bn = parseInt(bv, 10);
+      if (!isNaN(an) && !isNaN(bn)) {
+        if (an !== bn) return an - bn;
+      } else {
+        const cmp = av.toLowerCase().localeCompare(bv.toLowerCase());
+        if (cmp !== 0) return cmp;
+      }
+    }
+    return 0;
+  }
+
+  dropzone.addEventListener('click', () => fileInput.click());
+  fileInput.addEventListener('change', e => addFiles(e.target.files));
+
+  dropzone.addEventListener('dragover', e => { e.preventDefault(); dropzone.classList.add('dragover'); });
+  dropzone.addEventListener('dragleave', () => dropzone.classList.remove('dragover'));
+  dropzone.addEventListener('drop', e => {
+    e.preventDefault();
+    dropzone.classList.remove('dragover');
+    addFiles(e.dataTransfer.files);
+  });
+
+  function addFiles(newFiles) {
+    for (const f of newFiles) {
+      if (!f.name.match(/\.xlsx?$/i)) continue;
+      if (files.find(x => x.name === f.name)) continue;
+      files.push(f);
+    }
+    files.sort(naturalSort);
+    renderList();
+  }
+
+  function renderList() {
+    fileList.innerHTML = '';
+    if (files.length === 0) {
+      fileList.style.display = 'none';
+      sortInfo.style.display = 'none';
+      badge.style.display = 'none';
+      btnCombine.disabled = true;
+      return;
+    }
+    fileList.style.display = 'block';
+    sortInfo.style.display = 'block';
+    badge.style.display = 'inline-block';
+    badge.textContent = files.length;
+    btnCombine.disabled = false;
+
+    files.forEach((f, i) => {
+      const li = document.createElement('li');
+      const kb = (f.size / 1024).toFixed(1);
+      li.innerHTML =
+        '<span class="order">#' + (i + 1) + '</span>' +
+        '<span class="name">📄 ' + f.name + '</span>' +
+        '<span class="size">' + kb + ' KB</span>' +
+        '<button title="Eliminar" onclick="removeFile(' + i + ')">✕</button>';
+      fileList.appendChild(li);
+    });
+  }
+
+  function removeFile(i) {
+    files.splice(i, 1);
+    renderList();
+  }
+
+  btnClear.addEventListener('click', () => {
+    files = [];
+    fileInput.value = '';
+    renderList();
+    hideStatus();
+  });
+
+  btnCombine.addEventListener('click', async () => {
+    if (files.length === 0) return;
+    const mode       = document.getElementById('mode').value;
+    const outputName = document.getElementById('output-name').value.trim() || 'Combinado';
+    const skipHeader = document.getElementById('include-header').checked;
+
+    btnCombine.disabled = true;
+    progressWrap.style.display = 'block';
+    hideStatus();
+
+    try {
+      const workbook = XLSX.utils.book_new();
+
+      if (mode === 'append') {
+        let allData = [];
+        let headerCaptured = false;
+
+        for (let i = 0; i < files.length; i++) {
+          progressLbl.textContent = 'Leyendo ' + (i + 1) + ' de ' + files.length + ': ' + files[i].name;
+          progressBar.style.width = Math.round((i / files.length) * 100) + '%';
+
+          const data = await readFileAsArrayBuffer(files[i]);
+          const wb   = XLSX.read(data, { type: 'array' });
+          const ws   = wb.Sheets[wb.SheetNames[0]];
+          const rows = XLSX.utils.sheet_to_json(ws, { header: 1, defval: '' });
+
+          if (rows.length === 0) continue;
+
+          if (!headerCaptured) {
+            allData.push(...rows);
+            headerCaptured = true;
+          } else {
+            allData.push(...(skipHeader ? rows.slice(1) : rows));
+          }
+        }
+
+        const wsFinal = XLSX.utils.aoa_to_sheet(allData);
+        XLSX.utils.book_append_sheet(workbook, wsFinal, 'Datos Combinados');
+
+      } else {
+        for (let i = 0; i < files.length; i++) {
+          progressLbl.textContent = 'Procesando ' + (i + 1) + ' de ' + files.length + ': ' + files[i].name;
+          progressBar.style.width = Math.round((i / files.length) * 100) + '%';
+
+          const data = await readFileAsArrayBuffer(files[i]);
+          const wb   = XLSX.read(data, { type: 'array' });
+          const ws   = wb.Sheets[wb.SheetNames[0]];
+
+          let sheetName = files[i].name.replace(/\.xlsx?$/i, '').substring(0, 31);
+          let base = sheetName; let cnt = 2;
+          while (workbook.SheetNames.includes(sheetName)) {
+            sheetName = base.substring(0, 28) + '_' + cnt++;
+          }
+          XLSX.utils.book_append_sheet(workbook, ws, sheetName);
+        }
+      }
+
+      progressBar.style.width = '100%';
+      progressLbl.textContent = '✅ Generando archivo…';
+
+      XLSX.writeFile(workbook, outputName + '.xlsx');
+      showStatus('✅ Archivo "' + outputName + '.xlsx" generado con ' + files.length + ' archivos en orden correcto.', 'success');
+
+    } catch (err) {
+      showStatus('❌ Error al procesar los archivos: ' + err.message, 'error');
+    }
+
+    progressWrap.style.display = 'none';
+    btnCombine.disabled = false;
+  });
+
+  function readFileAsArrayBuffer(file) {
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload  = e => resolve(new Uint8Array(e.target.result));
+      reader.onerror = reject;
+      reader.readAsArrayBuffer(file);
+    });
+  }
+
+  function showStatus(msg, type) {
+    statusEl.textContent = msg;
+    statusEl.className = type;
+    statusEl.style.display = 'block';
+  }
+
+  function hideStatus() {
+    statusEl.style.display = 'none';
+  }
+</script>
+</body>
+</html>
